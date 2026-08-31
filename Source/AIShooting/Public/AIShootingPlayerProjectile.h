@@ -10,6 +10,7 @@ class AAIShootingCameraActor;
 class UProjectileMovementComponent;
 class USphereComponent;
 class UStaticMeshComponent;
+class UPrimitiveComponent;
 
 /** A player-fired projectile which travels only on the fixed YZ gameplay plane. */
 UCLASS()
@@ -41,8 +42,14 @@ public:
 private:
 	bool IsOutsideCameraBounds() const;
 
+	UFUNCTION()
+	void HandleCollisionOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,
+		UPrimitiveComponent* OtherComponent, int32 OtherBodyIndex, bool bFromSweep,
+		const FHitResult& SweepResult);
+
 	float FixedWorldX = 0.0f;
 	bool bHasInitializedDirection = false;
+	bool bHasHitTarget = false;
 
 	UPROPERTY()
 	TObjectPtr<AAIShootingCameraActor> GameplayCamera;

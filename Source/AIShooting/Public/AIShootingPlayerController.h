@@ -26,4 +26,5 @@ private:
 	void FireLeftReleased();
 	void FireRightPressed();
 	void FireRightReleased();
+	void RestartPressed();
 };

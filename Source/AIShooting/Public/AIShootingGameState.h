@@ -27,6 +27,8 @@ public:
 	int32 GetKillCount() const;
 
 	void SetGamePhase(EAIShootingGamePhase NewGamePhase);
+	/** Transitions from Playing to GameOver exactly once. */
+	bool TryEnterGameOver();
 	void AddKill();
 
 protected:

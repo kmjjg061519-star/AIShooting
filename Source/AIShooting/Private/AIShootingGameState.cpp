@@ -34,6 +34,17 @@ void AAIShootingGameState::SetGamePhase(const EAIShootingGamePhase NewGamePhase)
 	GamePhase = NewGamePhase;
 }
 
+bool AAIShootingGameState::TryEnterGameOver()
+{
+	if (!IsPlaying())
+	{
+		return false;
+	}
+
+	GamePhase = EAIShootingGamePhase::GameOver;
+	return true;
+}
+
 void AAIShootingGameState::AddKill()
 {
 	++KillCount;

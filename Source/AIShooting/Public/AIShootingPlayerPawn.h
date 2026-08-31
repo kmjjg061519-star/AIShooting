@@ -30,6 +30,10 @@ public:
 	void SetFireDownPressed(bool bPressed);
 	void SetFireLeftPressed(bool bPressed);
 	void SetFireRightPressed(bool bPressed);
+	/** Applies one enemy-contact hit. Repeated calls after death are ignored. */
+	void ApplyEnemyHit();
+
+	bool IsAlive() const { return bIsAlive; }
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Player|Components")
 	TObjectPtr<USphereComponent> CollisionComponent;
@@ -49,11 +53,18 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Player|Fire", meta = (ClampMin = "0.01", Units = "s"))
 	float FireIntervalSeconds = 0.2f;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Player|Combat")
+	int32 Health = 3;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Player|Combat")
+	bool bIsAlive = true;
+
 protected:
 	void MoveWithinGameplayBounds(float DeltaTime);
 	void UpdateFireState();
 	FVector GetFireDirection() const;
 	void FireProjectile();
+	void Die();
 
 private:
 	float FixedWorldX = 0.0f;

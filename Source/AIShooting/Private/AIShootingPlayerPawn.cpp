@@ -3,6 +3,7 @@
 #include "AIShootingPlayerPawn.h"
 
 #include "AIShootingCameraActor.h"
+#include "AIShootingGameModeBase.h"
 #include "AIShootingPlayerProjectile.h"
 #include "Components/SceneComponent.h"
 #include "Components/SphereComponent.h"
@@ -10,6 +11,7 @@
 #include "Engine/StaticMesh.h"
 #include "EngineUtils.h"
 #include "Engine/World.h"
+#include "GameFramework/PlayerController.h"
 #include "UObject/ConstructorHelpers.h"
 
 AAIShootingPlayerPawn::AAIShootingPlayerPawn()
@@ -19,7 +21,9 @@ AAIShootingPlayerPawn::AAIShootingPlayerPawn()
 	CollisionComponent = CreateDefaultSubobject<USphereComponent>(TEXT("CollisionComponent"));
 	CollisionComponent->InitSphereRadius(50.0f);
 	CollisionComponent->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
-	CollisionComponent->SetCollisionResponseToAllChannels(ECR_Overlap);
+	CollisionComponent->SetCollisionObjectType(ECC_GameTraceChannel1);
+	CollisionComponent->SetCollisionResponseToAllChannels(ECR_Ignore);
+	CollisionComponent->SetCollisionResponseToChannel(ECC_GameTraceChannel3, ECR_Overlap);
 	SetRootComponent(CollisionComponent);
 
 	VisualComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("VisualComponent"));
@@ -58,21 +62,39 @@ void AAIShootingPlayerPawn::Tick(float DeltaTime)
 
 void AAIShootingPlayerPawn::SetMoveHorizontalInput(float Value)
 {
-	MoveHorizontalInput = Value;
+	MoveHorizontalInput = bIsAlive ? Value : 0.0f;
 }
 
 void AAIShootingPlayerPawn::SetMoveVerticalInput(float Value)
 {
-	MoveVerticalInput = Value;
+	MoveVerticalInput = bIsAlive ? Value : 0.0f;
 }
 
-void AAIShootingPlayerPawn::SetFireUpPressed(bool bPressed) { bFireUpPressed = bPressed; UpdateFireState(); }
-void AAIShootingPlayerPawn::SetFireDownPressed(bool bPressed) { bFireDownPressed = bPressed; UpdateFireState(); }
-void AAIShootingPlayerPawn::SetFireLeftPressed(bool bPressed) { bFireLeftPressed = bPressed; UpdateFireState(); }
-void AAIShootingPlayerPawn::SetFireRightPressed(bool bPressed) { bFireRightPressed = bPressed; UpdateFireState(); }
+void AAIShootingPlayerPawn::SetFireUpPressed(bool bPressed) { bFireUpPressed = bIsAlive && bPressed; UpdateFireState(); }
+void AAIShootingPlayerPawn::SetFireDownPressed(bool bPressed) { bFireDownPressed = bIsAlive && bPressed; UpdateFireState(); }
+void AAIShootingPlayerPawn::SetFireLeftPressed(bool bPressed) { bFireLeftPressed = bIsAlive && bPressed; UpdateFireState(); }
+void AAIShootingPlayerPawn::SetFireRightPressed(bool bPressed) { bFireRightPressed = bIsAlive && bPressed; UpdateFireState(); }
+
+void AAIShootingPlayerPawn::ApplyEnemyHit()
+{
+	if (!bIsAlive)
+	{
+		return;
+	}
+
+	Health = FMath::Max(0, Health - 1);
+	if (Health == 0)
+	{
+		Die();
+	}
+}
 
 void AAIShootingPlayerPawn::MoveWithinGameplayBounds(float DeltaTime)
 {
+	if (!bIsAlive)
+	{
+		return;
+	}
 	const FVector2D InputVector(MoveHorizontalInput, MoveVerticalInput);
 	const FVector2D ClampedInput = InputVector.GetClampedToMaxSize(1.0f);
 	const FVector MovementDelta(0.0f, ClampedInput.X * MoveSpeedUnitsPerSecond * DeltaTime, ClampedInput.Y * MoveSpeedUnitsPerSecond * DeltaTime);
@@ -90,6 +112,11 @@ void AAIShootingPlayerPawn::MoveWithinGameplayBounds(float DeltaTime)
 
 void AAIShootingPlayerPawn::UpdateFireState()
 {
+	if (!bIsAlive)
+	{
+		GetWorldTimerManager().ClearTimer(FireTimerHandle);
+		return;
+	}
 	if (!GetFireDirection().IsNearlyZero())
 	{
 		if (!GetWorldTimerManager().IsTimerActive(FireTimerHandle))
@@ -113,6 +140,11 @@ FVector AAIShootingPlayerPawn::GetFireDirection() const
 
 void AAIShootingPlayerPawn::FireProjectile()
 {
+	if (!bIsAlive)
+	{
+		GetWorldTimerManager().ClearTimer(FireTimerHandle);
+		return;
+	}
 	const FVector Direction = GetFireDirection();
 	if (!ProjectileClass || Direction.IsNearlyZero())
 	{
@@ -129,5 +161,35 @@ void AAIShootingPlayerPawn::FireProjectile()
 	{
 		Projectile->InitializeProjectile(Direction, FixedWorldX);
 		Projectile->FinishSpawning(FTransform(SpawnLocation));
+	}
+}
+
+void AAIShootingPlayerPawn::Die()
+{
+	if (!bIsAlive)
+	{
+		return;
+	}
+
+	bIsAlive = false;
+	MoveHorizontalInput = 0.0f;
+	MoveVerticalInput = 0.0f;
+	bFireUpPressed = false;
+	bFireDownPressed = false;
+	bFireLeftPressed = false;
+	bFireRightPressed = false;
+	GetWorldTimerManager().ClearTimer(FireTimerHandle);
+	CollisionComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	SetActorEnableCollision(false);
+	SetActorTickEnabled(false);
+
+	if (APlayerController* PlayerController = Cast<APlayerController>(GetController()))
+	{
+		DisableInput(PlayerController);
+	}
+
+	if (AAIShootingGameModeBase* GameMode = GetWorld()->GetAuthGameMode<AAIShootingGameModeBase>())
+	{
+		GameMode->NotifyPlayerDied();
 	}
 }

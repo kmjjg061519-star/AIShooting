@@ -2,6 +2,8 @@
 
 #include "AIShootingPlayerController.h"
 
+#include "AIShootingGameModeBase.h"
+#include "AIShootingGameState.h"
 #include "AIShootingPlayerPawn.h"
 #include "Components/InputComponent.h"
 
@@ -19,6 +21,7 @@ void AAIShootingPlayerController::SetupInputComponent()
 	InputComponent->BindAction(TEXT("FireLeft"), IE_Released, this, &AAIShootingPlayerController::FireLeftReleased);
 	InputComponent->BindAction(TEXT("FireRight"), IE_Pressed, this, &AAIShootingPlayerController::FireRightPressed);
 	InputComponent->BindAction(TEXT("FireRight"), IE_Released, this, &AAIShootingPlayerController::FireRightReleased);
+	InputComponent->BindAction(TEXT("Restart"), IE_Pressed, this, &AAIShootingPlayerController::RestartPressed);
 }
 
 void AAIShootingPlayerController::FireUpPressed() { if (AAIShootingPlayerPawn* PlayerPawn = GetPawn<AAIShootingPlayerPawn>()) { PlayerPawn->SetFireUpPressed(true); } }
@@ -29,6 +32,20 @@ void AAIShootingPlayerController::FireLeftPressed() { if (AAIShootingPlayerPawn*
 void AAIShootingPlayerController::FireLeftReleased() { if (AAIShootingPlayerPawn* PlayerPawn = GetPawn<AAIShootingPlayerPawn>()) { PlayerPawn->SetFireLeftPressed(false); } }
 void AAIShootingPlayerController::FireRightPressed() { if (AAIShootingPlayerPawn* PlayerPawn = GetPawn<AAIShootingPlayerPawn>()) { PlayerPawn->SetFireRightPressed(true); } }
 void AAIShootingPlayerController::FireRightReleased() { if (AAIShootingPlayerPawn* PlayerPawn = GetPawn<AAIShootingPlayerPawn>()) { PlayerPawn->SetFireRightPressed(false); } }
+
+void AAIShootingPlayerController::RestartPressed()
+{
+	const AAIShootingGameState* AIShootingGameState = GetWorld() ? GetWorld()->GetGameState<AAIShootingGameState>() : nullptr;
+	if (!AIShootingGameState || !AIShootingGameState->IsGameOver())
+	{
+		return;
+	}
+
+	if (AAIShootingGameModeBase* GameMode = GetWorld()->GetAuthGameMode<AAIShootingGameModeBase>())
+	{
+		GameMode->RequestRestart();
+	}
+}
 
 void AAIShootingPlayerController::MoveHorizontal(float Value)
 {

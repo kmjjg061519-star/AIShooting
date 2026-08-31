@@ -3,6 +3,8 @@
 #include "AIShootingPlayerProjectile.h"
 
 #include "AIShootingCameraActor.h"
+#include "AIShootingEnemyPawn.h"
+#include "AIShootingGameState.h"
 #include "Components/SphereComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "GameFramework/ProjectileMovementComponent.h"
@@ -17,7 +19,10 @@ AAIShootingPlayerProjectile::AAIShootingPlayerProjectile()
 	CollisionComponent = CreateDefaultSubobject<USphereComponent>(TEXT("CollisionComponent"));
 	CollisionComponent->InitSphereRadius(15.0f);
 	CollisionComponent->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
-	CollisionComponent->SetCollisionResponseToAllChannels(ECR_Overlap);
+	CollisionComponent->SetCollisionObjectType(ECC_GameTraceChannel2);
+	CollisionComponent->SetCollisionResponseToAllChannels(ECR_Ignore);
+	CollisionComponent->SetCollisionResponseToChannel(ECC_GameTraceChannel3, ECR_Overlap);
+	CollisionComponent->OnComponentBeginOverlap.AddDynamic(this, &AAIShootingPlayerProjectile::HandleCollisionOverlap);
 	SetRootComponent(CollisionComponent);
 
 	VisualComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("VisualComponent"));
@@ -52,6 +57,14 @@ void AAIShootingPlayerProjectile::BeginPlay()
 void AAIShootingPlayerProjectile::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+
+	const AAIShootingGameState* GameState = GetWorld() ? GetWorld()->GetGameState<AAIShootingGameState>() : nullptr;
+	if (!GameState || !GameState->IsPlaying())
+	{
+		CollisionComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		ProjectileMovement->StopMovementImmediately();
+		return;
+	}
 
 	FVector Location = GetActorLocation();
 	Location.X = FixedWorldX;
@@ -94,4 +107,24 @@ bool AAIShootingPlayerProjectile::IsOutsideCameraBounds() const
 	const FVector Location = GetActorLocation();
 	const float Radius = CollisionComponent->GetScaledSphereRadius();
 	return FMath::Abs(Location.Y) > HalfExtents.X + Radius || FMath::Abs(Location.Z) > HalfExtents.Y + Radius;
+}
+
+void AAIShootingPlayerProjectile::HandleCollisionOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,
+	UPrimitiveComponent* OtherComponent, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
+{
+	AAIShootingGameState* GameState = GetWorld() ? GetWorld()->GetGameState<AAIShootingGameState>() : nullptr;
+	if (bHasHitTarget || !GameState || !GameState->IsPlaying())
+	{
+		return;
+	}
+
+	if (AAIShootingEnemyPawn* EnemyPawn = Cast<AAIShootingEnemyPawn>(OtherActor))
+	{
+		bHasHitTarget = true;
+		CollisionComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		ProjectileMovement->StopMovementImmediately();
+		EnemyPawn->Die();
+		GameState->AddKill();
+		Destroy();
+	}
 }
